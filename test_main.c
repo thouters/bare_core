@@ -6,7 +6,7 @@
  */
 
 #include "elfcore.h"
-
+#include <string.h>
 
 void test_elfcore(void);
 
@@ -17,6 +17,7 @@ Frame core_frame;
 
 void test_elfcore()
 {
+    memset(core_buf, 0xde, sizeof(core_buf));
     CreateElfCore("core", 0x1fffc000, (uint8_t *)core_buf, 32*1024, &core_frame);
 }
 

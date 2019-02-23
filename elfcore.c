@@ -50,6 +50,7 @@
 #include <sys/errno.h>
 #include <unistd.h>
 
+#include <assert.h>
 
 #ifndef CLONE_UNTRACED
 #define CLONE_UNTRACED 0x00800000
@@ -230,7 +231,7 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
       size_t start_address, end_address, offset;
       int   flags;
     } mappings[1] = {
-            { (size_t)ram_addr, (size_t)ram_addr + ram_size, 0, PF_W }
+            { (size_t)ram_addr, (size_t)ram_addr + ram_size, 0, PF_W|PF_R }
     };
 
     size_t note_align;
@@ -260,6 +261,7 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
           ehdr.e_phnum    = num_mappings + 1;
           ehdr.e_shentsize= sizeof(Shdr);
           if (c_write(handle, &ehdr, sizeof(Ehdr)) != sizeof(Ehdr)) {
+            assert(0);
             goto done;
           }
         }
@@ -270,16 +272,16 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
           Phdr   phdr;
           size_t offset   = sizeof(Ehdr) + (num_mappings + 1)*sizeof(Phdr);
           size_t filesz   = sizeof(Nhdr) + 4 + sizeof(struct prpsinfo) +
-                            sizeof(Nhdr) + 4 + sizeof(struct user) +
                             num_threads*(
                             + sizeof(Nhdr) + 4 + sizeof(struct prstatus)
-                            + sizeof(Nhdr) + 4 + sizeof(struct fpregs));
+                            );
 
           memset(&phdr, 0, sizeof(Phdr));
           phdr.p_type     = PT_NOTE;
           phdr.p_offset   = offset;
           phdr.p_filesz   = filesz;
           if (c_write(handle, &phdr, sizeof(Phdr)) != sizeof(Phdr)) {
+            assert(0);
             goto done;
           }
 
@@ -304,6 +306,7 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
             phdr.p_filesz = filesz;
             phdr.p_flags  = mappings[i].flags;
             if (c_write(handle, &phdr, sizeof(Phdr)) != sizeof(Phdr)) {
+              assert(0);
               goto done;
             }
           }
@@ -320,6 +323,7 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
               c_write(handle, "CORE", 4) != 4 ||
               c_write(handle, &prpsinfo, sizeof(struct prpsinfo)) !=
               sizeof(struct prpsinfo)) {
+              assert(0);
             goto done;
           }
 
@@ -333,6 +337,7 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
                 c_write(handle, "CORE", 4) != 4 ||
                 c_write(handle, &prstatus, sizeof(struct prstatus)) !=
                 sizeof(struct prstatus)) {
+                assert(0);
               goto done;
             }
           }
@@ -341,8 +346,9 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
         /* Align all following segments to multiples of page size            */
         if (note_align) {
           char scratch[note_align];
-          memset(scratch, 0, sizeof(scratch));
+          memset(scratch, 0, note_align);
           if (c_write(handle, scratch, sizeof(scratch)) != sizeof(scratch)) {
+            assert(0);
             goto done;
           }
         }
@@ -356,7 +362,16 @@ int CreateElfCore(char *fn, uint32_t ram_addr, uint8_t *raw_buf, uint32_t ram_si
             goto done;
           }
         }
-
+        {
+          Phdr   phdr;
+          memset(&phdr, 0, sizeof(Phdr));
+          phdr.p_type     = PT_NULL;
+          phdr.p_paddr    = 0;
+            if (c_write(handle, &phdr, sizeof(Phdr)) != sizeof(Phdr)) {
+              assert(0);
+              goto done;
+            }
+        }
 done:
     close(handle);
     return rc;
